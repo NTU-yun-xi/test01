@@ -14,6 +14,7 @@ include_directories(
 set(SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/a.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/test.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/s.cpp
 )
 
 # 添加可执行文件

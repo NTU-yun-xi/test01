@@ -6,6 +6,16 @@ void Imgupdate(int, void*) {
 
 int main() {
 
+     int target_aspect = static_cast<int>(LightPair::TargetAspect * 100);
+    int tolerance = static_cast<int>(LightPair::AspectTolerance * 100);
+
+    cv::createTrackbar("Aspect(x100)", "HSV", &target_aspect, 400, [](int val, void*) {
+        LightPair::TargetAspect = val / 100.0f;
+    });
+
+    cv::createTrackbar("Tol(x100)", "HSV", &tolerance, 50, [](int val, void*) {
+        LightPair::AspectTolerance = val / 100.0f;
+    });
 
     int frame_width = 640;
     int frame_height = 480;

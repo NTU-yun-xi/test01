@@ -60,46 +60,64 @@ void display(std::vector<cv::Mat>& images) {
 }
 
 cv::Mat get_contours(cv::Mat Input, cv::Mat ori, int minarea) {    //只能处理一通道
-    std::vector<std::vector<cv::Point>> contours;
-    //cv::Mat conImg = cv::Mat::zeros(Input.size(), CV_8UC3);
-    cv::Mat conImg = ori.clone();
-    std::vector<cv::Rect> light;
-    cv::findContours(Input, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-    cv::Point Pos1, Pos2;
-    for (auto s : contours) {
+    std::vector<std::vector<cv::Point>> contours; // 存储所有轮廓点集
+    // cv::Mat conImg = cv::Mat::zeros(Input.size(), CV_8UC3); // 可选：创建全黑底图
+    cv::Mat conImg = ori.clone(); // 用原图做底图，后续在其上绘制
+    std::vector<cv::Rect> light;  // 存储符合条件的外接矩形
+    cv::findContours(Input, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE); // 查找轮廓
+    cv::Point Pos1, Pos2; // 可用于后续标注点
+    for (const auto& s : contours) {
+    long area = cv::contourArea(s);
+    if (area > minarea) {
+        // 可选：绘制所有轮廓
+        // cv::drawContours(conImg, contours, -1, cv::Scalar(255, 0, 255), 1);
 
-        long area = cv::contourArea(s);
-        if (area > minarea) {
-            //cv::drawContours(conImg, contours, -1, cv::Scalar(255, 0, 255), 7);
+        double peri = cv::arcLength(s, true); // 计算周长
+        std::vector<cv::Point> approx;
+        cv::approxPolyDP(s, approx, 0.02 * peri, true); // 多边形拟合
+        if (approx.empty()) {
+            std::cerr << "no approx points" << std::endl;
+            continue;
+        }
 
+        // 获取最小外接矩形
+        cv::Rect rect = cv::boundingRect(approx);
 
-            double peri = cv::arcLength(s, true); // 计算周长
-            std::vector<cv::Point> approx;
-            cv::approxPolyDP(s, approx, 0.02 * peri, true); // 多边形拟合
-            if (approx.empty()) std::cerr << "no approx points" << std::endl;
+        // 绘制外接矩形
+        cv::rectangle(conImg, rect, cv::Scalar(255, 0, 255), 1);
 
+        // 显示多边形点数和面积
+        cv::Point pos1 = { rect.x , rect.y + 20 };
+        cv::Point pos2 = { rect.x , rect.y + 40 };
+        cv::putText(conImg, "Points: " + std::to_string(approx.size()), pos1, cv::FONT_HERSHEY_COMPLEX, 0.8, cv::Scalar(255, 0, 0), 1);
+        cv::putText(conImg, "Area: " + std::to_string((int)area), pos2, cv::FONT_HERSHEY_COMPLEX, 0.8, cv::Scalar(255, 0, 0), 1);
 
-            cv::Rect rect = cv::boundingRect(approx); // 获取最小外接矩形  cv::minAreaRect()矩形有可能会旋转以获取绝对意义上的最小外围矩形
-
-            cv::rectangle(conImg, rect, cv::Scalar(255, 0, 255), 1);
-
-            cv::Point pos1 = { rect.x , rect.y + 20 };
-            cv::Point pos2 = { rect.x , rect.y + 40 };
-
-            cv::putText(conImg, "Points: " + std::to_string(approx.size()), pos1, cv::FONT_HERSHEY_COMPLEX, 0.8, cv::Scalar(255, 0, 0), 1);
-            cv::putText(conImg, "Points: " + std::to_string((int)area), pos2, cv::FONT_HERSHEY_COMPLEX, 0.8, cv::Scalar(255, 0, 0), 1);
-            //get_light(rect,Light);
-            if (rect.area() > 500 && rect.area() < 1000) {
-                light.push_back(rect);
-            }
+        // 满足面积条件的矩形加入 light
+        if (rect.area() > 500 && rect.area() < 1000) {
+            light.push_back(rect);
         }
     }
-    //std::cout << contours.size() << std::endl;
-    if (light.size() == 2) {
-        cv::Rect light_rect(light[0].tl(), light[1].br());
-        cv::Point center = cv::Point((light_rect.x + light_rect.width / 2), (light_rect.y + light_rect.height / 2));
-        cv::circle(conImg, center, 5, cv::Scalar(255, 0, 255), 2);
-        cv::rectangle(conImg, light_rect, cv::Scalar(0, 255, 0), 1);
+}
+
+if (light.size() >= 2) {
+        // 查找所有符合长宽比条件的配对
+        std::vector<LightPair> validPairs = LightPair::findValidPairs(light);
+        
+        // 仅绘制有效配对
+        for (const auto& pair : validPairs) {
+            // 绘制绿色包围框
+            cv::rectangle(conImg, pair.greenRect, cv::Scalar(0, 255, 0), 1);
+            
+            // 绘制中心点
+            cv::circle(conImg, pair.center, 5, cv::Scalar(255, 0, 255), 2);
+            
+            // 显示长宽比（精确到小数点后两位）
+            std::stringstream ss;
+            ss << std::fixed << std::setprecision(2) << pair.aspectRatio;
+            cv::putText(conImg, "Ratio: " + ss.str(),
+                cv::Point(pair.center.x - 50, pair.center.y + 25),
+                cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 0), 1);
+        }
     }
     return conImg;
 }
